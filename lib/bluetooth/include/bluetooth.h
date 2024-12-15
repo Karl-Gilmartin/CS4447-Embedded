@@ -13,6 +13,9 @@
 #include "services/gatt/ble_svc_gatt.h"
 #include "sdkconfig.h"
 #include "../../../src/dht11.h"
+#include "../../../src/potentiometer.h"
+#include "../../../src/servo.h"
+
 
 
 #define TAG "[MyProject]"  // Log tag

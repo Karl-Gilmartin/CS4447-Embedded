@@ -29,33 +29,12 @@ void get_bluetooth_mac_address(void) {
 // Write data to ESP32 defined as server
 static int device_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
-    // printf("Data from the client: %.*s\n", ctxt->om->om_len, ctxt->om->om_data);
+    // Print the raw data received from the client
+    printf("Data from the client: %.*s\n", ctxt->om->om_len, (char *)ctxt->om->om_data);
 
-    char * data = (char *)ctxt->om->om_data;
-    printf("%d\n",strcmp(data, (char *)"LIGHT ON")==0);
-    if (strcmp(data, (char *)"LIGHT ON\0")==0)
-    {
-       printf("LIGHT ON\n");
-    }
-    else if (strcmp(data, (char *)"LIGHT OFF\0")==0)
-    {
-        printf("LIGHT OFF\n");
-    }
-    else if (strcmp(data, (char *)"FAN ON\0")==0)
-    {
-        printf("FAN ON\n");
-    }
-    else if (strcmp(data, (char *)"FAN OFF\0")==0)
-    {
-        printf("FAN OFF\n");
-    }
-    else{
-        printf("Data from the client: %.*s\n", ctxt->om->om_len, ctxt->om->om_data);
-    }
-    
-    
-    return 0;
+    return 0; // Return success
 }
+
 
 int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
     struct dht_reading data;
@@ -110,6 +89,22 @@ int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access
     return 0;
 }
 
+static int read_window_state(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
+    const char *state = window_open ? "OPEN" : "CLOSED";
+    os_mbuf_append(ctxt->om, state, strlen(state));
+    ESP_LOGI("BLE", "Window state read: %s", state);
+    return 0;
+}
+
+static int read_temperature(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
+    char temp_str[16];
+    snprintf(temp_str, sizeof(temp_str), "%.2f", potentiometer_temperature);
+    os_mbuf_append(ctxt->om, temp_str, strlen(temp_str));
+    ESP_LOGI("BLE", "Temperature read: %s°C", temp_str);
+    return 0;
+}
+
+
 
 
 // // Read data from ESP32 defined as server
@@ -123,16 +118,23 @@ int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access
 // UUID - Universal Unique Identifier
 static const struct ble_gatt_svc_def gatt_svcs[] = {
     {.type = BLE_GATT_SVC_TYPE_PRIMARY,
-     .uuid = BLE_UUID16_DECLARE(0x180),                 // Define UUID for device type
+     .uuid = BLE_UUID16_DECLARE(0x180), // Service UUID
      .characteristics = (struct ble_gatt_chr_def[]){
-         {.uuid = BLE_UUID16_DECLARE(0xFEF4),           // Define UUID for reading
+         {.uuid = BLE_UUID16_DECLARE(0xFEF4),           // DHT characteristic
           .flags = BLE_GATT_CHR_F_READ,
           .access_cb = send_data},
-         {.uuid = BLE_UUID16_DECLARE(0xDEAD),           // Define UUID for writing
+         {.uuid = BLE_UUID16_DECLARE(0xDEAD),           // Write characteristic
           .flags = BLE_GATT_CHR_F_WRITE,
           .access_cb = device_write},
+         {.uuid = BLE_UUID16_DECLARE(0xBEEF),           // Window state characteristic
+          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+          .access_cb = read_window_state},
+         {.uuid = BLE_UUID16_DECLARE(0xC0FF),           // Temperature characteristic
+          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+          .access_cb = read_temperature},
          {0}}},
     {0}};
+
 
 // BLE event handling
 static int ble_gap_event(struct ble_gap_event *event, void *arg)
