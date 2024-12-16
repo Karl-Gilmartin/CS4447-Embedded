@@ -15,6 +15,7 @@
 #include "../../../src/dht11.h"
 #include "../../../src/potentiometer.h"
 #include "../../../src/servo.h"
+#include "../../../src/main.h"
 
 
 

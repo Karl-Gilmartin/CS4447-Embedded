@@ -9,10 +9,11 @@
 #include "dht_espidf.h"
 #include "potentiometer.h"
 #include "config.h"
+#include "circularBuffer.h"
 
 #define DHT_TAG "[DHT_Module]"
 
-extern QueueHandle_t dht_queue;
+// extern QueueHandle_t dht_queue;
 
 
 // Declare the temp_read function prototype

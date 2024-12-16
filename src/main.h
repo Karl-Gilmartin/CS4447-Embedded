@@ -10,8 +10,12 @@
 #include "esp_adc_cal.h"
 #include "esp_log.h"
 #include "esp_err.h"
-#include "bluetoothsetup.h"
 #include "dht11.h"
+#include "servo.h"
+#include "circularBuffer.h"
+
+extern CircularBuffer dht_buffer;
+extern SemaphoreHandle_t buffer_mutex;
 
 void app_main();
 

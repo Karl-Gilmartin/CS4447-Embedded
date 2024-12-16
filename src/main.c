@@ -5,6 +5,7 @@
 #include "bluetooth.h"
 #include "servo.h"
 #include "potentiometer.h"
+#include "main.h"
 
 // Servo control task declaration (defined elsewhere)
 void servo_task(void *param);
@@ -12,7 +13,8 @@ void servo_task(void *param);
 
 // Bluetooth callback for sending data
 
-QueueHandle_t dht_queue;
+CircularBuffer dht_buffer;
+SemaphoreHandle_t buffer_mutex;
 
 // App main
 void app_main() {
@@ -32,30 +34,41 @@ void app_main() {
     }
 
     // Create a queue for DHT data
-    dht_queue = xQueueCreate(10, sizeof(struct dht_reading));
-    if (dht_queue == NULL) {
-        printf("Failed to create DHT queue\n");
+    // dht_queue = xQueueCreate(10, sizeof(struct dht_reading));
+    // if (dht_queue == NULL) {
+    //     printf("Failed to create DHT queue\n");
+    //     return;
+    // }
+    init_buffer(&dht_buffer);
+    buffer_mutex = xSemaphoreCreateMutex();
+    if (buffer_mutex == NULL) {
+        printf("Failed to create buffer mutex\n");
         return;
     }
 
+    if (xTaskCreate(dht_task, "DHT Task", 2048, &dht_buffer, 5, NULL) != pdPASS) {
+        ESP_LOGE("Main", "Failed to create DHT task");
+    }
+
+
+    ESP_LOGI("Main", "System initialized successfully");
+
     // Create the servo task
     //xTaskCreate(servo_task, "Servo Task", 2048, NULL, 5, NULL);
-
 
 
     // Initialize Bluetooth
     bluetooth_init();
     
     // Initialize ADC
-    potentiometer_init();
+    // potentiometer_init();
 
     // Configure ISR timer
-    setup_potentiometer_timer();
+    // setup_potentiometer_timer();
 
     // Start the potentiometer task
-    xTaskCreate(potentiometer_task, "Potentiometer Task", 2048, NULL, 5, NULL);
+    // xTaskCreate(potentiometer_task, "Potentiometer Task", 2048, NULL, 5, NULL);
 
-    // Start DHT task
-    xTaskCreate(dht_task, "DHT Task", 2048, NULL, 5, NULL);
+    
 
 }

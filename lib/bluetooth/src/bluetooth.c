@@ -4,6 +4,7 @@
 #include "esp_mac.h"
 #include "esp_log.h"
 
+
 uint8_t ble_addr_type;
 void ble_app_advertise(void);
 
@@ -37,57 +38,52 @@ static int device_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_g
 
 
 int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
-    struct dht_reading data;
-    if (xQueueReceive(dht_queue, &data, 0) == pdPASS) {
-        ESP_LOGI("BLE", "Data received from queue: Temp=%.2f°C, Humidity=%.2f%%", data.temperature, data.humidity);
+    DhtData data;
 
-        uint8_t buffer[12] = {0};
+    // Protect buffer access with the mutex
+    if (xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
+        if (get_from_buffer(&dht_buffer, &data)) {
+            uint8_t buffer[12] = {0};
 
-        // Add header
-        buffer[0] = 'D';
-        buffer[1] = 'H';
-        buffer[2] = 'T';
-        ESP_LOGI("BLE", "Header set: %c%c%c", buffer[0], buffer[1], buffer[2]);
+            // Add header
+            buffer[0] = 'D';
+            buffer[1] = 'H';
+            buffer[2] = 'T';
 
-        // Serialize temperature and humidity using a union
-        union {
-            float value;
-            uint8_t bytes[sizeof(float)];
-        } temp_union, hum_union;
+            // Serialize temperature and humidity
+            union {
+                float value;
+                uint8_t bytes[sizeof(float)];
+            } temp_union, hum_union;
 
-        temp_union.value = data.temperature;
-        hum_union.value = data.humidity;
+            temp_union.value = data.temperature;
+            hum_union.value = data.humidity;
 
-        memcpy(&buffer[3], temp_union.bytes, sizeof(float));
-        memcpy(&buffer[7], hum_union.bytes, sizeof(float));
+            memcpy(&buffer[3], temp_union.bytes, sizeof(float));
+            memcpy(&buffer[7], hum_union.bytes, sizeof(float));
 
-        // Log serialized bytes
-        ESP_LOGI("BLE", "Serialized Temp bytes: %02X %02X %02X %02X", buffer[3], buffer[4], buffer[5], buffer[6]);
-        ESP_LOGI("BLE", "Serialized Humidity bytes: %02X %02X %02X %02X", buffer[7], buffer[8], buffer[9], buffer[10]);
+            // Calculate checksum
+            buffer[11] = 0;
+            for (int i = 0; i < 11; i++) {
+                buffer[11] ^= buffer[i];
+            }
 
-        // Calculate checksum
-        buffer[11] = 0;
-        for (int i = 0; i < 11; i++) {
-            buffer[11] ^= buffer[i];
+            // Send the serialized data to the BLE client
+            os_mbuf_append(ctxt->om, buffer, sizeof(buffer));
+
+            ESP_LOGI("BLE", "Sent DHT data: Temp=%.2f°C, Humidity=%.2f%%", data.temperature, data.humidity);
+        } else {
+            ESP_LOGW("BLE", "Buffer is empty, no data to send");
+            os_mbuf_append(ctxt->om, "No data", strlen("No data"));
         }
-        ESP_LOGI("BLE", "Checksum calculated: 0x%X", buffer[11]);
-
-        // Log final buffer content
-        ESP_LOGI("BLE", "Final buffer content (hex):");
-        for (int i = 0; i < sizeof(buffer); i++) {
-            printf("%02X ", buffer[i]);
-        }
-        printf("\n");
-
-        // Send the data
-        os_mbuf_append(ctxt->om, buffer, sizeof(buffer));
-        ESP_LOGI("BLE", "Sent DHT data: Temp=%.2f°C, Humidity=%.2f%%", data.temperature, data.humidity);
+        xSemaphoreGive(buffer_mutex);
     } else {
-        ESP_LOGW("BLE", "No data available in queue");
-        os_mbuf_append(ctxt->om, "No data", strlen("No data"));
+        ESP_LOGW("BLE", "Failed to acquire mutex for buffer");
+        os_mbuf_append(ctxt->om, "Error", strlen("Error"));
     }
     return 0;
 }
+
 
 static int read_window_state(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
     const char *state = window_open ? "OPEN" : "CLOSED";
