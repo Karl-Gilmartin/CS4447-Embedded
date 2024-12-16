@@ -13,6 +13,7 @@
 #include "dht11.h"
 #include "servo.h"
 #include "circularBuffer.h"
+#include "statemachine.h"
 
 extern CircularBuffer dht_buffer;
 extern SemaphoreHandle_t buffer_mutex;

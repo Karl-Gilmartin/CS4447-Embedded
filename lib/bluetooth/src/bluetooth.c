@@ -89,8 +89,19 @@ static int read_window_state(uint16_t conn_handle, uint16_t attr_handle, struct 
     const char *state = window_open ? "OPEN" : "CLOSED";
     os_mbuf_append(ctxt->om, state, strlen(state));
     ESP_LOGI("BLE", "Window state read: %s", state);
+
+
+    if (strcmp(state, "OPEN") == 0) {
+        statemachine_handle_event("OPEN_WINDOW");
+    } else if (strcmp(state, "CLOSED") == 0) {
+        statemachine_handle_event("CLOSE_WINDOW");
+    } else {
+        ESP_LOGW("BLE", "Unknown window state command: %s", state);
+    }
+
     return 0;
 }
+
 
 static int read_temperature(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
     char temp_str[16];

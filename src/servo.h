@@ -5,6 +5,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "driver/ledc.h"
+#include "statemachine.h"
 
 // Define GPIO pin for the servo signal
 #define SERVO_GPIO 18  // Use any PWM-capable GPIO pin

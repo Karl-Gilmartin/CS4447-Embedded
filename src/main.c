@@ -26,6 +26,10 @@ void app_main() {
     }
     ESP_ERROR_CHECK(ret);
 
+    //state machine
+    statemachine_init();
+
+
     // Create a queue for servo commands
     command_queue = xQueueCreate(10, sizeof(char[16])); // Ensure queue size matches servo_task
     if (command_queue == NULL) {
@@ -33,12 +37,6 @@ void app_main() {
         return;
     }
 
-    // Create a queue for DHT data
-    // dht_queue = xQueueCreate(10, sizeof(struct dht_reading));
-    // if (dht_queue == NULL) {
-    //     printf("Failed to create DHT queue\n");
-    //     return;
-    // }
     init_buffer(&dht_buffer);
     buffer_mutex = xSemaphoreCreateMutex();
     if (buffer_mutex == NULL) {
@@ -54,11 +52,16 @@ void app_main() {
     ESP_LOGI("Main", "System initialized successfully");
 
     // Create the servo task
-    //xTaskCreate(servo_task, "Servo Task", 2048, NULL, 5, NULL);
+    if (xTaskCreate(servo_task, "Servo Task", 2048, NULL, 5, NULL) != pdPASS) {
+        ESP_LOGE("Main", "Failed to create Servo task");
+        return;
+    }
 
 
     // Initialize Bluetooth
     bluetooth_init();
+
+
     
     // Initialize ADC
     // potentiometer_init();

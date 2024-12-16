@@ -16,6 +16,7 @@
 #include "../../../src/potentiometer.h"
 #include "../../../src/servo.h"
 #include "../../../src/main.h"
+#include "../../../src/statemachine.h"
 
 
 
