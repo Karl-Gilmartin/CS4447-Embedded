@@ -22,9 +22,6 @@ void statemachine_handle_event(const char *command) {
     } else if (strcmp(command, "MANUAL_MODE") == 0) {
         current_state = STATE_MANUAL;
         ESP_LOGI(TAG, "Transition to MANUAL mode");
-    } else if (strcmp(command, "RESET") == 0) {
-        current_state = STATE_IDLE;
-        ESP_LOGI(TAG, "System reset to IDLE state");
     } else if (strcmp(command, "OPEN_WINDOW") == 0) {
         window_state = WINDOW_OPEN;
         ESP_LOGI(TAG, "Window state set to OPEN");
@@ -46,6 +43,7 @@ void statemachine_handle_event(const char *command) {
         ESP_LOGW(TAG, "Unknown command: %s", command);
     }
 }
+
 
 
 // Set State

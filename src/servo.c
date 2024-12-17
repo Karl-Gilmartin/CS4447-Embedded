@@ -1,8 +1,5 @@
 #include "servo.h"
-#include <stdio.h>
-#include <string.h>
-#include "circularBuffer.h"
-#include "main.h"
+
 
 // Define the queue handle
 QueueHandle_t command_queue;
@@ -20,13 +17,15 @@ uint32_t servo_angle_to_duty(int angle) {
 float get_current_temperature() {
     DhtData data;
     float current_temperature = -1.0; // Default value if no data is available
+    // ESP_LOGW("CircularBuffer X Servo", "trying to read");
 
     // Protect access to the circular buffer
     if (xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
         if (get_from_buffer(&dht_buffer, &data)) {
             current_temperature = data.temperature;
+            ESP_LOGI("SERVO X CB", "Current temperature: %.2f°C", current_temperature);
         } else {
-            ESP_LOGW("CircularBuffer", "No data available in buffer");
+            ESP_LOGW("CircularBuffer", "No data available in buffexr");
         }
         xSemaphoreGive(buffer_mutex);
     } else {
@@ -45,56 +44,48 @@ void servo_task(void *param) {
 
         switch (state) {
             case STATE_IDLE:
-                ESP_LOGI("Servo", "System is idle. Waiting for commands...");
-                vTaskDelay(pdMS_TO_TICKS(1000));
+                ESP_LOGI("Servo", "System is idle.");
+                vTaskDelay(pdMS_TO_TICKS(2000));
                 break;
 
-            case STATE_MANUAL: {
-                char command[16];
-                if (xQueueReceive(command_queue, &command, portMAX_DELAY)) {
-                    if (strcmp(command, "OPEN_WINDOW") == 0 && !window_is_open) {
-                        ESP_LOGI("Servo", "Manual: Opening window");
-                        ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, servo_angle_to_duty(180));
-                        ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-                        window_is_open = true;
-                    } else if (strcmp(command, "CLOSE_WINDOW") == 0 && window_is_open) {
-                        ESP_LOGI("Servo", "Manual: Closing window");
-                        ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, servo_angle_to_duty(0));
-                        ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-                        window_is_open = false;
-                    }
-                }
-                break;
-            }
-
-            case STATE_AUTO: {
-                float threshold_open = 30.0;
-                float threshold_close = 25.0;
-                // GET TEMP FROM BUFFER
-                float current_temperature = get_current_temperature();
-                ESP_LOGI("Servo", "TEMP FROM BUFFER: Auto: Current temperature: %.2f°C", current_temperature);
-                if (current_temperature > threshold_open && !window_is_open) {
-                    ESP_LOGI("Servo", "Auto: Temperature high. Opening window.");
+            case STATE_MANUAL:
+                if (statemachine_get_window_state() == WINDOW_OPEN && !window_is_open) {
+                    ESP_LOGI("Servo", "Manual: Opening window");
                     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, servo_angle_to_duty(180));
                     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
                     window_is_open = true;
-                } else if (current_temperature < threshold_close && window_is_open) {
-                    ESP_LOGI("Servo", "Auto: Temperature low. Closing window.");
+                } else if (statemachine_get_window_state() == WINDOW_CLOSED && window_is_open) {
+                    ESP_LOGI("Servo", "Manual: Closing window");
                     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, servo_angle_to_duty(0));
                     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
                     window_is_open = false;
                 }
-                vTaskDelay(pdMS_TO_TICKS(1000));
+                vTaskDelay(pdMS_TO_TICKS(2000));
                 break;
-            }
+
+            case STATE_AUTO:
+                float current_temperature = get_current_temperature();
+                if (current_temperature > 30.0 && !window_is_open) {
+                    ESP_LOGI("Servo", "Auto: Temperature high (%.2f°C). Opening window.", current_temperature);
+                    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, servo_angle_to_duty(180));
+                    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+                    window_is_open = true;
+                } else if (current_temperature < 25.0 && window_is_open) {
+                    ESP_LOGI("Servo", "Auto: Temperature low (%.2f°C). Closing window.", current_temperature);
+                    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, servo_angle_to_duty(0));
+                    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+                    window_is_open = false;
+                }
+                vTaskDelay(pdMS_TO_TICKS(2000));
+                break;
 
             case STATE_ERROR:
-                ESP_LOGE("Servo", "Error state. Halting servo operations.");
-                vTaskDelay(pdMS_TO_TICKS(1000));
+                ESP_LOGE("Servo", "Error state. Halting operations.");
+                vTaskDelay(pdMS_TO_TICKS(2000));
                 break;
 
             default:
-                ESP_LOGE("Servo", "Unknown state");
+                ESP_LOGE("Servo", "Unknown state.");
                 break;
         }
     }

@@ -52,7 +52,7 @@ void app_main() {
     ESP_LOGI("Main", "System initialized successfully");
 
     // Create the servo task
-    if (xTaskCreate(servo_task, "Servo Task", 2048, NULL, 5, NULL) != pdPASS) {
+    if (xTaskCreate(servo_task, "Servo Task", 2048, NULL, 4, NULL) != pdPASS) {
         ESP_LOGE("Main", "Failed to create Servo task");
         return;
     }
@@ -71,6 +71,7 @@ void app_main() {
 
     // Start the potentiometer task
     // xTaskCreate(potentiometer_task, "Potentiometer Task", 2048, NULL, 5, NULL);
+    statemachine_handle_event("AUTO_MODE");
 
     
 

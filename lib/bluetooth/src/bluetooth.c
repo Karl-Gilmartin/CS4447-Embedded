@@ -28,18 +28,32 @@ void get_bluetooth_mac_address(void) {
 }
 
 // Write data to ESP32 defined as server
-static int device_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
-{
-    // Print the raw data received from the client
-    printf("Data from the client: %.*s\n", ctxt->om->om_len, (char *)ctxt->om->om_data);
+static int device_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
+    char command[16];
+    strncpy(command, (char *)ctxt->om->om_data, ctxt->om->om_len);
+    command[ctxt->om->om_len] = '\0'; // Null-terminate the string
 
-    return 0; // Return success
+    ESP_LOGI("BLE", "Data from Agent: %s", command);
+
+    if (strcmp(command, "OPEN") == 0) {
+        statemachine_handle_event("OPEN_WINDOW");
+    } else if (strcmp(command, "CLOSE") == 0) {
+        statemachine_handle_event("CLOSE_WINDOW");
+    } else if (strcmp(command, "MANUAL_MODE") == 0) {
+        statemachine_handle_event("MANUAL_MODE");
+    } else if (strcmp(command, "AUTO_MODE") == 0) {
+        statemachine_handle_event("AUTO_MODE");
+    } else {
+        ESP_LOGW("BLE", "Unknown command: %s", command);
+    }
+
+    return 0;
 }
 
 
 int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
     DhtData data;
-
+    ESP_LOGI("BLE", "Attempeting to write DHT data");
     // Protect buffer access with the mutex
     if (xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
         if (get_from_buffer(&dht_buffer, &data)) {
