@@ -14,6 +14,32 @@ uint32_t servo_angle_to_duty(int angle) {
     return (pulsewidth * 8192) / 20000; // Convert to duty cycle for 50Hz
 }
 
+void servo_init() {
+    // Configure LEDC timer
+    ledc_timer_config_t ledc_timer = {
+        .speed_mode       = LEDC_LOW_SPEED_MODE,
+        .timer_num        = LEDC_TIMER_0,
+        .duty_resolution  = LEDC_TIMER_13_BIT,
+        .freq_hz          = 50,  // 50Hz frequency for servo motors
+        .clk_cfg          = LEDC_AUTO_CLK
+    };
+    ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
+
+    // Configure LEDC channel
+    ledc_channel_config_t ledc_channel = {
+        .speed_mode     = LEDC_LOW_SPEED_MODE,
+        .channel        = LEDC_CHANNEL_0,
+        .timer_sel      = LEDC_TIMER_0,
+        .intr_type      = LEDC_INTR_DISABLE,
+        .gpio_num       = SERVO_GPIO,  // Replace with the GPIO number connected to your servo
+        .duty           = 0,           // Initial duty cycle
+        .hpoint         = 0
+    };
+    ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
+
+    ESP_LOGI("Servo", "LEDC initialized for servo control.");
+}
+
 float get_current_temperature() {
     DhtData data;
     float current_temperature = -1.0; // Default value if no data is available
@@ -37,6 +63,7 @@ float get_current_temperature() {
 
 // Task to control the servo motor based on commands
 void servo_task(void *param) {
+    servo_init();
     static bool window_is_open = false;
 
     while (1) {
@@ -65,12 +92,12 @@ void servo_task(void *param) {
 
             case STATE_AUTO:
                 float current_temperature = get_current_temperature();
-                if (current_temperature > 30.0 && !window_is_open) {
+                if (current_temperature > 20.0 && !window_is_open) {
                     ESP_LOGI("Servo", "Auto: Temperature high (%.2f°C). Opening window.", current_temperature);
                     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, servo_angle_to_duty(180));
                     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
                     window_is_open = true;
-                } else if (current_temperature < 25.0 && window_is_open) {
+                } else if (current_temperature < 15.0 && window_is_open) {
                     ESP_LOGI("Servo", "Auto: Temperature low (%.2f°C). Closing window.", current_temperature);
                     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, servo_angle_to_duty(0));
                     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
