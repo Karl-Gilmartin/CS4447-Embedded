@@ -1,6 +1,15 @@
 {
     "files.associations": {
         "esp_system.h": "c",
-        "bluetooth.h": "c"
+        "bluetooth.h": "c",
+        "potentiometer.h": "c",
+        "dht11.h": "c",
+        "main.h": "c",
+        "statemachine.h": "c",
+        "stdio.h": "c",
+        "servo.h": "c",
+        "esp_log.h": "c",
+        "circularbuffer.h": "c",
+        "string.h": "c"
     }
 }

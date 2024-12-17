@@ -43,7 +43,6 @@ void servo_init() {
 float get_current_temperature() {
     DhtData data;
     float current_temperature = -1.0; // Default value if no data is available
-    // ESP_LOGW("CircularBuffer X Servo", "trying to read");
 
     // Protect access to the circular buffer
     if (xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
@@ -92,18 +91,24 @@ void servo_task(void *param) {
 
             case STATE_AUTO:
                 float current_temperature = get_current_temperature();
-                if (current_temperature > 20.0 && !window_is_open) {
+                float target_temperature = potentiometer_temperature;
+
+                ESP_LOGI("Servo", "Auto Mode: Current Temp=%.2f°C, Target Temp=%.2f°C", 
+                        current_temperature, target_temperature);
+
+                if (current_temperature > target_temperature + 2.0 && !window_is_open) {
                     ESP_LOGI("Servo", "Auto: Temperature high (%.2f°C). Opening window.", current_temperature);
                     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, servo_angle_to_duty(180));
                     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
                     window_is_open = true;
-                } else if (current_temperature < 15.0 && window_is_open) {
+                } else if (current_temperature < target_temperature - 2.0 && window_is_open) {
                     ESP_LOGI("Servo", "Auto: Temperature low (%.2f°C). Closing window.", current_temperature);
                     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, servo_angle_to_duty(0));
                     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
                     window_is_open = false;
                 }
-                vTaskDelay(pdMS_TO_TICKS(2000));
+
+                vTaskDelay(pdMS_TO_TICKS(1000));  // Check every second
                 break;
 
             case STATE_ERROR:

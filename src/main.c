@@ -28,6 +28,10 @@ void app_main() {
 
     //state machine
     statemachine_init();
+    potentiometer_init();
+    if (xTaskCreate(potentiometer_task, "Potentiometer Task", 2048, NULL, 6, NULL) != pdPASS) {
+        ESP_LOGE("Main", "Failed to create Potentiometer task");
+    }
 
 
     // Create a queue for servo commands
@@ -62,15 +66,6 @@ void app_main() {
     bluetooth_init();
 
 
-    
-    // Initialize ADC
-    // potentiometer_init();
-
-    // Configure ISR timer
-    // setup_potentiometer_timer();
-
-    // Start the potentiometer task
-    // xTaskCreate(potentiometer_task, "Potentiometer Task", 2048, NULL, 5, NULL);
     statemachine_handle_event("AUTO_MODE");
 
     
