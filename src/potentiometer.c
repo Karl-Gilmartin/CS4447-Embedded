@@ -3,6 +3,8 @@
 // Global variables
 volatile float potentiometer_temperature = 0.0;
 volatile bool potentiometer_changed_flag = false;  // ISR flag
+static float last_sent_temperature = 0.0;          // Last temperature sent to BLE
+static uint64_t last_update_time = 0;              // Timestamp of the last BLE update
 
 void IRAM_ATTR potentiometer_isr_handler(void *arg) {
     static int last_value = -1;  // Store the last ADC value

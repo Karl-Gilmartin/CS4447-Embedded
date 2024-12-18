@@ -108,7 +108,7 @@ void servo_task(void *param) {
                     window_is_open = false;
                 }
 
-                vTaskDelay(pdMS_TO_TICKS(1000));  // Check every second
+                vTaskDelay(pdMS_TO_TICKS(2000));  // Check every second
                 break;
 
             case STATE_ERROR:
