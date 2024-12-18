@@ -4,7 +4,6 @@
 // Define the queue handle
 QueueHandle_t command_queue;
 
-// Define `window_open`
 volatile bool window_open = false;
 
 // Function to convert angle to pulse width
@@ -51,7 +50,7 @@ float get_current_temperature() {
         }
         xSemaphoreGive(buffer_mutex);
     } else {
-        ESP_LOGW("CircularBuffer", "Failed to acquire buffer mutex");
+        ESP_LOGW("CircularBuffer", "Failed to acquire buffer mutex, DHT Task must have it");
     }
 
     return current_temperature;

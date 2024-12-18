@@ -28,6 +28,5 @@ extern volatile bool potentiometer_changed_flag;  // Flag to indicate change in 
 // Function prototypes
 void potentiometer_init();                         // Initialize the potentiometer
 void potentiometer_task(void *pvParameter);        // Task to monitor potentiometer changes
-// void potentiometer_send_temperature_to_ble();      // Send set temperature to BLE clients
 
 #endif // POTENTIOMETER_H

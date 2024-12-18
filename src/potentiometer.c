@@ -3,8 +3,6 @@
 // Global variables
 volatile float potentiometer_temperature = 0.0;
 volatile bool potentiometer_changed_flag = false;  // ISR flag
-static float last_sent_temperature = 0.0;          // Last temperature sent to BLE
-static uint64_t last_update_time = 0;              // Timestamp of the last BLE update
 
 void IRAM_ATTR potentiometer_isr_handler(void *arg) {
     static int last_value = -1;  // Store the last ADC value
@@ -16,11 +14,11 @@ void IRAM_ATTR potentiometer_isr_handler(void *arg) {
 
         // Log details (Use ESP_EARLY_LOG for ISR-safe logging)
         if (current_value > THRESHOLD_HIGH && last_value <= THRESHOLD_HIGH) {
-            ESP_EARLY_LOGW(TAG, "ISR: High threshold crossed! ADC=%d (Prev=%d)", current_value, last_value);
+            ESP_EARLY_LOGW(TAG, "ISR: High threshold crossed!");
         } else if (current_value < THRESHOLD_LOW && last_value >= THRESHOLD_LOW) {
-            ESP_EARLY_LOGW(TAG, "ISR: Low threshold crossed! ADC=%d (Prev=%d)", current_value, last_value);
+            ESP_EARLY_LOGW(TAG, "ISR: Low threshold crossed! ");
         } else {
-            ESP_EARLY_LOGI(TAG, "ISR: Significant ADC change detected. ADC=%d (Prev=%d)", current_value, last_value);
+            ESP_EARLY_LOGI(TAG, "ISR: Significant ADC change detected.");
         }
     }
 

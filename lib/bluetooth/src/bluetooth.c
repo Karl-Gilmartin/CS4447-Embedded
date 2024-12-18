@@ -27,19 +27,19 @@ void get_bluetooth_mac_address(void) {
     }
 }
 
-// Write data to ESP32 defined as server
-static int device_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
+// 
+static int read_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
     char command[16];
     strncpy(command, (char *)ctxt->om->om_data, ctxt->om->om_len);
     command[ctxt->om->om_len] = '\0'; // Null-terminate the string
 
-    ESP_LOGI(TAG, "Data from Agent: %s", command); // It will be True or False
+    ESP_LOGI(TAG, "Data from Agent: %s", command); // It will be True or False- True = Open, False = Close
     blink_led(YELLOW_LED_GPIO, 1000);
 
 
-    if (strcmp(command, "OPEN") == 0) {
+    if (strcmp(command, "True") == 0) {
         statemachine_handle_event("OPEN_WINDOW");
-    } else if (strcmp(command, "CLOSE") == 0) {
+    } else if (strcmp(command, "False") == 0) {
         statemachine_handle_event("CLOSE_WINDOW");
     } else if (strcmp(command, "MANUAL_MODE") == 0) {
         statemachine_handle_event("MANUAL_MODE");
@@ -55,13 +55,13 @@ static int device_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_g
 
 int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
     DhtData data;
-    const char *device_name = "Firebeetle"; // Replace with your device name
+    const char *device_name = "Firebeetle";
     size_t name_len = strlen(device_name);
 
     // Protect buffer access with the mutex
     if (xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
         if (get_from_buffer(&dht_buffer, &data)) {
-            // Calculate the total buffer size: 12 bytes for DHT data + device name length + 1 for null terminator
+            // 12 bytes for DHT data + device name length + 1 for null terminator
             size_t buffer_size = 12 + name_len + 1;
             uint8_t *buffer = (uint8_t *)malloc(buffer_size);
             if (!buffer) {
@@ -119,38 +119,57 @@ int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access
 
 
 
-static int read_window_state(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
-    const char *state = window_open ? "OPEN" : "CLOSED";
-    os_mbuf_append(ctxt->om, state, strlen(state));
-    ESP_LOGI(TAG, "Window state read: %s", state);
+static int read_temperature(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
+    const char *device_name = "Firebeetle";
+    size_t name_len = strlen(device_name);
 
-
-    if (strcmp(state, "OPEN") == 0) {
-        statemachine_handle_event("OPEN_WINDOW");
-    } else if (strcmp(state, "CLOSED") == 0) {
-        statemachine_handle_event("CLOSE_WINDOW");
-    } else {
-        ESP_LOGW(TAG, "Unknown window state command: %s", state);
+    // device name length + header (3 bytes) + temperature data (4 bytes) + checksum (1 byte)
+    size_t buffer_size = name_len + 3 + sizeof(float) + 1;
+    uint8_t *buffer = (uint8_t *)malloc(buffer_size);
+    if (!buffer) {
+        ESP_LOGE(TAG, "Failed to allocate memory for buffer");
+        os_mbuf_append(ctxt->om, "Error", strlen("Error"));
+        return -1;
     }
 
-    return 0;
-}
+    // Add the device name to the buffer
+    memcpy(buffer, device_name, name_len);
 
-static int read_temperature(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
-    // Prepare the temperature value as bytes
-    uint8_t temperature_bytes[4];
-    memcpy(temperature_bytes, &potentiometer_temperature, sizeof(potentiometer_temperature));
+    // Add header
+    buffer[name_len + 0] = 'T';
+    buffer[name_len + 1] = 'E';
+    buffer[name_len + 2] = 'M';
 
-    // Send the temperature data
-    int rc = os_mbuf_append(ctxt->om, temperature_bytes, sizeof(temperature_bytes));
+    // Serialize temperature
+    union {
+        float value;
+        uint8_t bytes[sizeof(float)];
+    } temp_union;
+
+    temp_union.value = potentiometer_temperature;
+    memcpy(&buffer[name_len + 3], temp_union.bytes, sizeof(float));
+
+    // Calculate checksum
+    buffer[name_len + 7] = 0; // Clear the checksum byte
+    for (int i = 0; i < name_len + 7; i++) {
+        buffer[name_len + 7] ^= buffer[i];
+    }
+
+    // Send the serialized data to the BLE client
+    int rc = os_mbuf_append(ctxt->om, buffer, buffer_size);
     if (rc == 0) {
-        ESP_LOGI(TAG, "Temperature sent to BLE: %.2f°C", potentiometer_temperature);
-        return 0;  // Success
+        ESP_LOGI(TAG, "Sent temperature data: Device=%s, Temp=%.2f°C",
+                 device_name, potentiometer_temperature);
+        blink_led(GREEN_LED_GPIO, 100); // Indicate successful data transmission
     } else {
         ESP_LOGE(TAG, "Failed to append temperature data. Error code: %d", rc);
-        return BLE_ATT_ERR_INSUFFICIENT_RES;  // Error response for insufficient resources
+        blink_led(RED_LED_GPIO, 500); // Indicate an error
     }
+
+    free(buffer); // Free allocated memory
+    return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
+
 
 
 
@@ -165,10 +184,7 @@ static const struct ble_gatt_svc_def gatt_svcs[] = {
           .access_cb = send_data},
          {.uuid = BLE_UUID16_DECLARE(0xDEAD),           // Write characteristic
           .flags = BLE_GATT_CHR_F_WRITE,
-          .access_cb = device_write},
-         {.uuid = BLE_UUID16_DECLARE(0xBEEF),           // Window state characteristic
-          .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
-          .access_cb = read_window_state},
+          .access_cb = read_data},
          {.uuid = BLE_UUID16_DECLARE(0xC0FF),           // Temperature characteristic
           .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
           .access_cb = read_temperature},

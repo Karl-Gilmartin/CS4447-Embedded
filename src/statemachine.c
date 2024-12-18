@@ -44,8 +44,6 @@ void statemachine_handle_event(const char *command) {
     }
 }
 
-
-
 // Set State
 void statemachine_set_state(SystemState state) {
     current_state = state;

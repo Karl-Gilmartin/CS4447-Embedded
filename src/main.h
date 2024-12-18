@@ -15,6 +15,9 @@
 #include "circularBuffer.h"
 #include "statemachine.h"
 #include "led.h"
+#include <freertos/queue.h>
+#include "bluetooth.h"
+#include "potentiometer.h"
 
 extern CircularBuffer dht_buffer;
 extern SemaphoreHandle_t buffer_mutex;

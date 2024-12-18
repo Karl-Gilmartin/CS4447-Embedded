@@ -10,11 +10,9 @@
 #include "potentiometer.h"
 #include "config.h"
 #include "circularBuffer.h"
+#include <freertos/queue.h>
 
 #define DHT_TAG "DHT_11"
-
-// extern QueueHandle_t dht_queue;
-
 
 // Declare the temp_read function prototype
 struct dht_reading temp_read();
