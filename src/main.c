@@ -18,6 +18,7 @@ SemaphoreHandle_t buffer_mutex;
 
 // App main
 void app_main() {
+    init_leds();
     // Initialize NVS (required for Bluetooth)
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -33,6 +34,7 @@ void app_main() {
         ESP_LOGE("Main", "Failed to create Potentiometer task");
     }
 
+    
 
     // Create a queue for servo commands
     command_queue = xQueueCreate(10, sizeof(char[16])); // Ensure queue size matches servo_task
@@ -56,7 +58,7 @@ void app_main() {
     ESP_LOGI("Main", "System initialized successfully");
 
     // Create the servo task
-    if (xTaskCreate(servo_task, "Servo Task", 2048, NULL, 4, NULL) != pdPASS) {
+    if (xTaskCreate(servo_task, "Servo Task", 2048, NULL, 3, NULL) != pdPASS) {
         ESP_LOGE("Main", "Failed to create Servo task");
         return;
     }

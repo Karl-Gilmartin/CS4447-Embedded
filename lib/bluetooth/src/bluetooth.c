@@ -33,7 +33,9 @@ static int device_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_g
     strncpy(command, (char *)ctxt->om->om_data, ctxt->om->om_len);
     command[ctxt->om->om_len] = '\0'; // Null-terminate the string
 
-    ESP_LOGI("BLE", "Data from Agent: %s", command);
+    ESP_LOGI("BLE", "Data from Agent: %s", command); // It will be True or False
+    blink_led(YELLOW_LED_GPIO, 1000);
+
 
     if (strcmp(command, "OPEN") == 0) {
         statemachine_handle_event("OPEN_WINDOW");
@@ -53,16 +55,31 @@ static int device_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_g
 
 int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
     DhtData data;
-    ESP_LOGI("BLE", "Attempeting to write DHT data");
+    const char *device_name = "Firebeetle"; // Replace with your device name
+    size_t name_len = strlen(device_name);
+    ESP_LOGI("BLE", "Attempting to write DHT data");
+
     // Protect buffer access with the mutex
     if (xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
         if (get_from_buffer(&dht_buffer, &data)) {
-            uint8_t buffer[12] = {0};
+            // Calculate the total buffer size: 12 bytes for DHT data + device name length + 1 for null terminator
+            size_t buffer_size = 12 + name_len + 1;
+            uint8_t *buffer = (uint8_t *)malloc(buffer_size);
+            ESP_LOGI("BLE", "in mutex");
+            if (!buffer) {
+                ESP_LOGE("BLE", "Failed to allocate memory for buffer");
+                xSemaphoreGive(buffer_mutex);
+                os_mbuf_append(ctxt->om, "Error", strlen("Error"));
+                return -1;
+            }
+
+            // Add the device name to the buffer
+            memcpy(buffer, device_name, name_len);
 
             // Add header
-            buffer[0] = 'D';
-            buffer[1] = 'H';
-            buffer[2] = 'T';
+            buffer[name_len + 0] = 'D';
+            buffer[name_len + 1] = 'H';
+            buffer[name_len + 2] = 'T';
 
             // Serialize temperature and humidity
             union {
@@ -73,19 +90,23 @@ int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access
             temp_union.value = data.temperature;
             hum_union.value = data.humidity;
 
-            memcpy(&buffer[3], temp_union.bytes, sizeof(float));
-            memcpy(&buffer[7], hum_union.bytes, sizeof(float));
+            memcpy(&buffer[name_len + 3], temp_union.bytes, sizeof(float));
+            memcpy(&buffer[name_len + 7], hum_union.bytes, sizeof(float));
 
             // Calculate checksum
-            buffer[11] = 0;
-            for (int i = 0; i < 11; i++) {
-                buffer[11] ^= buffer[i];
+            buffer[name_len + 11] = 0;
+            for (int i = 0; i < name_len + 11; i++) {
+                buffer[name_len + 11] ^= buffer[i];
             }
 
             // Send the serialized data to the BLE client
-            os_mbuf_append(ctxt->om, buffer, sizeof(buffer));
+            os_mbuf_append(ctxt->om, buffer, buffer_size);
 
-            ESP_LOGI("BLE", "Sent DHT data: Temp=%.2f°C, Humidity=%.2f%%", data.temperature, data.humidity);
+            ESP_LOGI("BLE", "Sent DHT data: Device=%s, Temp=%.2f°C, Humidity=%.2f%%",
+                     device_name, data.temperature, data.humidity);
+            blink_led(GREEN_LED_GPIO, 1000);
+
+            free(buffer); // Free allocated memory
         } else {
             ESP_LOGW("BLE", "Buffer is empty, no data to send");
             os_mbuf_append(ctxt->om, "No data", strlen("No data"));
@@ -97,6 +118,7 @@ int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access
     }
     return 0;
 }
+
 
 
 static int read_window_state(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
@@ -116,24 +138,23 @@ static int read_window_state(uint16_t conn_handle, uint16_t attr_handle, struct 
     return 0;
 }
 
-
 static int read_temperature(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
-    char temp_str[16];
-    snprintf(temp_str, sizeof(temp_str), "%.2f", potentiometer_temperature);
-    os_mbuf_append(ctxt->om, temp_str, strlen(temp_str));
-    ESP_LOGI("BLE", "Temperature read: %s°C", temp_str);
-    return 0;
+    // Prepare the temperature value as bytes
+    uint8_t temperature_bytes[4];
+    memcpy(temperature_bytes, &potentiometer_temperature, sizeof(potentiometer_temperature));
+
+    // Send the temperature data
+    int rc = os_mbuf_append(ctxt->om, temperature_bytes, sizeof(temperature_bytes));
+    if (rc == 0) {
+        ESP_LOGI(TAG, "Temperature sent to BLE: %.2f°C", potentiometer_temperature);
+        return 0;  // Success
+    } else {
+        ESP_LOGE(TAG, "Failed to append temperature data. Error code: %d", rc);
+        return BLE_ATT_ERR_INSUFFICIENT_RES;  // Error response for insufficient resources
+    }
 }
 
 
-
-
-// // Read data from ESP32 defined as server
-// static int device_read(uint16_t con_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
-// {
-//     os_mbuf_append(ctxt->om, "Data from the server", strlen("Data from the server"));
-//     return 0;
-// }
 
 // Array of pointers to other service definitions
 // UUID - Universal Unique Identifier
@@ -193,6 +214,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                  event->disconnect.conn.peer_ota_addr.val[4],
                  event->disconnect.conn.peer_ota_addr.val[5]);
         // Restart advertising
+        blink_led(RED_LED_GPIO, 10000);
         ble_app_advertise();
     case BLE_GAP_EVENT_ADV_COMPLETE:
         ESP_LOGI("GAP", "BLE GAP EVENT");

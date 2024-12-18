@@ -17,6 +17,8 @@
 #include "../../../src/servo.h"
 #include "../../../src/main.h"
 #include "../../../src/statemachine.h"
+#include "../../../src/config.h"
+#include "../../../src/led.h"
 
 
 
@@ -26,3 +28,5 @@ void get_mac_address();
 void bluetooth_init();
 int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
 void get_bluetooth_mac_address();
+static int read_temperature(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
+static int read_window_state(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);

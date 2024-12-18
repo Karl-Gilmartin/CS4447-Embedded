@@ -14,6 +14,7 @@
 #include "servo.h"
 #include "circularBuffer.h"
 #include "statemachine.h"
+#include "led.h"
 
 extern CircularBuffer dht_buffer;
 extern SemaphoreHandle_t buffer_mutex;
