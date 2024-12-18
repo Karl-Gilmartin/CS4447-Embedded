@@ -22,7 +22,7 @@
 
 
 
-#define TAG "[MyProject]"  // Log tag
+#define TAG "BLE"  // Log tag
 
 void get_mac_address();
 void bluetooth_init();

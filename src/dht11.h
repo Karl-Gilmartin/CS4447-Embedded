@@ -11,7 +11,7 @@
 #include "config.h"
 #include "circularBuffer.h"
 
-#define DHT_TAG "[DHT_Module]"
+#define DHT_TAG "DHT_11"
 
 // extern QueueHandle_t dht_queue;
 

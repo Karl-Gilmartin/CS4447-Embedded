@@ -33,7 +33,7 @@ static int device_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_g
     strncpy(command, (char *)ctxt->om->om_data, ctxt->om->om_len);
     command[ctxt->om->om_len] = '\0'; // Null-terminate the string
 
-    ESP_LOGI("BLE", "Data from Agent: %s", command); // It will be True or False
+    ESP_LOGI(TAG, "Data from Agent: %s", command); // It will be True or False
     blink_led(YELLOW_LED_GPIO, 1000);
 
 
@@ -46,7 +46,7 @@ static int device_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_g
     } else if (strcmp(command, "AUTO_MODE") == 0) {
         statemachine_handle_event("AUTO_MODE");
     } else {
-        ESP_LOGW("BLE", "Unknown command: %s", command);
+        ESP_LOGW(TAG, "Unknown command: %s", command);
     }
 
     return 0;
@@ -57,7 +57,6 @@ int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access
     DhtData data;
     const char *device_name = "Firebeetle"; // Replace with your device name
     size_t name_len = strlen(device_name);
-    ESP_LOGI("BLE", "Attempting to write DHT data");
 
     // Protect buffer access with the mutex
     if (xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
@@ -65,9 +64,8 @@ int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access
             // Calculate the total buffer size: 12 bytes for DHT data + device name length + 1 for null terminator
             size_t buffer_size = 12 + name_len + 1;
             uint8_t *buffer = (uint8_t *)malloc(buffer_size);
-            ESP_LOGI("BLE", "in mutex");
             if (!buffer) {
-                ESP_LOGE("BLE", "Failed to allocate memory for buffer");
+                ESP_LOGE(TAG, "Failed to allocate memory for buffer");
                 xSemaphoreGive(buffer_mutex);
                 os_mbuf_append(ctxt->om, "Error", strlen("Error"));
                 return -1;
@@ -102,18 +100,18 @@ int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access
             // Send the serialized data to the BLE client
             os_mbuf_append(ctxt->om, buffer, buffer_size);
 
-            ESP_LOGI("BLE", "Sent DHT data: Device=%s, Temp=%.2f°C, Humidity=%.2f%%",
+            ESP_LOGI(TAG, "Sent DHT data: Device=%s, Temp=%.2f°C, Humidity=%.2f%%",
                      device_name, data.temperature, data.humidity);
             blink_led(GREEN_LED_GPIO, 1000);
 
             free(buffer); // Free allocated memory
         } else {
-            ESP_LOGW("BLE", "Buffer is empty, no data to send");
+            ESP_LOGW(TAG, "Buffer is empty, no data to send");
             os_mbuf_append(ctxt->om, "No data", strlen("No data"));
         }
         xSemaphoreGive(buffer_mutex);
     } else {
-        ESP_LOGW("BLE", "Failed to acquire mutex for buffer");
+        ESP_LOGW(TAG, "Failed to acquire mutex for buffer");
         os_mbuf_append(ctxt->om, "Error", strlen("Error"));
     }
     return 0;
@@ -124,7 +122,7 @@ int send_data(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access
 static int read_window_state(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
     const char *state = window_open ? "OPEN" : "CLOSED";
     os_mbuf_append(ctxt->om, state, strlen(state));
-    ESP_LOGI("BLE", "Window state read: %s", state);
+    ESP_LOGI(TAG, "Window state read: %s", state);
 
 
     if (strcmp(state, "OPEN") == 0) {
@@ -132,7 +130,7 @@ static int read_window_state(uint16_t conn_handle, uint16_t attr_handle, struct 
     } else if (strcmp(state, "CLOSED") == 0) {
         statemachine_handle_event("CLOSE_WINDOW");
     } else {
-        ESP_LOGW("BLE", "Unknown window state command: %s", state);
+        ESP_LOGW(TAG, "Unknown window state command: %s", state);
     }
 
     return 0;
@@ -185,7 +183,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
     {
     // Advertise if connected
     case BLE_GAP_EVENT_CONNECT:
-        ESP_LOGI("GAP", "BLE GAP EVENT CONNECT %s", event->connect.status == 0 ? "OK!" : "FAILED!");
+        ESP_LOGI(TAG, "BLE Connection signal status: %s", event->connect.status == 0 ? "OK!" : "FAILED!");
         if (event->connect.status == 0) { // Connection successful
             struct ble_gap_conn_desc conn_desc;
             if (ble_gap_conn_find(event->connect.conn_handle, &conn_desc) == 0) {

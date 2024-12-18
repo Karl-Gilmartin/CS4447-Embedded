@@ -11,7 +11,7 @@ volatile bool window_open = false;
 uint32_t servo_angle_to_duty(int angle) {
     uint32_t pulsewidth = SERVO_MIN_PULSEWIDTH +
                           ((SERVO_MAX_PULSEWIDTH - SERVO_MIN_PULSEWIDTH) * angle) / SERVO_MAX_DEGREE;
-    return (pulsewidth * 8192) / 20000; // Convert to duty cycle for 50Hz
+    return (pulsewidth * 8192) / 50000; // Convert to duty cycle for 50Hz
 }
 
 void servo_init() {
@@ -36,8 +36,6 @@ void servo_init() {
         .hpoint         = 0
     };
     ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
-
-    ESP_LOGI("Servo", "LEDC initialized for servo control.");
 }
 
 float get_current_temperature() {
@@ -48,7 +46,6 @@ float get_current_temperature() {
     if (xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
         if (get_from_buffer(&dht_buffer, &data)) {
             current_temperature = data.temperature;
-            ESP_LOGI("SERVO X CB", "Current temperature: %.2f°C", current_temperature);
         } else {
             ESP_LOGW("CircularBuffer", "No data available in buffexr");
         }
@@ -70,54 +67,54 @@ void servo_task(void *param) {
 
         switch (state) {
             case STATE_IDLE:
-                ESP_LOGI("Servo", "System is idle.");
-                vTaskDelay(pdMS_TO_TICKS(2000));
+                ESP_LOGI("Servo_Task", "System is idle.");
+                vTaskDelay(pdMS_TO_TICKS(5000));
                 break;
 
             case STATE_MANUAL:
                 if (statemachine_get_window_state() == WINDOW_OPEN && !window_is_open) {
-                    ESP_LOGI("Servo", "Manual: Opening window");
+                    ESP_LOGI("Servo_Task", "Manual: Opening window");
                     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, servo_angle_to_duty(180));
                     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
                     window_is_open = true;
                 } else if (statemachine_get_window_state() == WINDOW_CLOSED && window_is_open) {
-                    ESP_LOGI("Servo", "Manual: Closing window");
+                    ESP_LOGI("Servo_Task", "Manual: Closing window");
                     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, servo_angle_to_duty(0));
                     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
                     window_is_open = false;
                 }
-                vTaskDelay(pdMS_TO_TICKS(2000));
+                vTaskDelay(pdMS_TO_TICKS(5000));
                 break;
 
             case STATE_AUTO:
                 float current_temperature = get_current_temperature();
                 float target_temperature = potentiometer_temperature;
 
-                ESP_LOGI("Servo", "Auto Mode: Current Temp=%.2f°C, Target Temp=%.2f°C", 
+                ESP_LOGI("Servo_Task", "Auto Mode: Current Temp=%.2f°C, Target Temp=%.2f°C", 
                         current_temperature, target_temperature);
 
                 if (current_temperature > target_temperature + 2.0 && !window_is_open) {
-                    ESP_LOGI("Servo", "Auto: Temperature high (%.2f°C). Opening window.", current_temperature);
+                    ESP_LOGI("Servo_Task", "Auto: Temperature high (%.2f°C). Opening window.", current_temperature);
                     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, servo_angle_to_duty(180));
                     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
                     window_is_open = true;
                 } else if (current_temperature < target_temperature - 2.0 && window_is_open) {
-                    ESP_LOGI("Servo", "Auto: Temperature low (%.2f°C). Closing window.", current_temperature);
+                    ESP_LOGI("Servo_Task", "Auto: Temperature low (%.2f°C). Closing window.", current_temperature);
                     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, servo_angle_to_duty(0));
                     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
                     window_is_open = false;
                 }
 
-                vTaskDelay(pdMS_TO_TICKS(2000));  // Check every second
+                vTaskDelay(pdMS_TO_TICKS(5000));  // Check every second
                 break;
 
             case STATE_ERROR:
-                ESP_LOGE("Servo", "Error state. Halting operations.");
-                vTaskDelay(pdMS_TO_TICKS(2000));
+                ESP_LOGE("Servo_Task", "Error state. Halting operations.");
+                vTaskDelay(pdMS_TO_TICKS(5000));
                 break;
 
             default:
-                ESP_LOGE("Servo", "Unknown state.");
+                ESP_LOGE("Servo_Task", "Unknown state.");
                 break;
         }
     }

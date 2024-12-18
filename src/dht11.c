@@ -11,7 +11,6 @@ struct dht_reading temp_read() {
         if (res == DHT_OK) {
             if (dht_data.temperature >= -40 && dht_data.temperature <= 80 &&
                 dht_data.humidity >= 0 && dht_data.humidity <= 100) {
-                ESP_LOGI(DHT_TAG, "Valid reading: %.2f°C, %.2f%%", dht_data.temperature, dht_data.humidity);
                 return dht_data;
             } else {
                 ESP_LOGW(DHT_TAG, "Out-of-range reading: %.2f°C, %.2f%%", dht_data.temperature, dht_data.humidity);

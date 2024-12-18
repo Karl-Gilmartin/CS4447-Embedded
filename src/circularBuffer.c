@@ -38,7 +38,6 @@ bool get_from_buffer(CircularBuffer *cb, DhtData *data) {
     cb->tail = (cb->tail + 1) % BUFFER_SIZE;
     cb->count--;
 
-    ESP_LOGI("CircularBuffer", "Retrieved from buffer: Temp=%.2f°C, Humidity=%.2f%%", data->temperature, data->humidity);
     return true;
 }
 
